@@ -1,0 +1,25 @@
+body {
+    background:
+        /* On "top" */
+        repeating-linear-gradient(45deg,
+            transparent,
+            transparent 4px,
+            #171717 4px,
+            black 8px),
+        /* on "bottom" */
+        linear-gradient(to bottom,
+            #171717,
+            black);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+
+    .text-value {
+        color: #56c423;
+    }
+
+    .custom-text-input {
+        background: transparent;
+        border: 1px solid #28A745;
+        color: white;
+    }
+}
