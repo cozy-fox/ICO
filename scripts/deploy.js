@@ -1,38 +1,25 @@
-// This is a script for deploying your contracts. You can adapt it to deploy
-// yours, or create new ones.
-
+const { ethers } = require("hardhat");
 const path = require("path");
-
 async function main() {
-  // This is just a convenience check
-  if (network.name === "hardhat") {
-    console.warn(
-      "You are trying to deploy a contract to the Hardhat Network, which" +
-        "gets automatically created and destroyed every time. Use the Hardhat" +
-        " option '--network localhost'"
-    );
-  }
-
-  // ethers is available in the global scope
   const [deployer] = await ethers.getSigners();
-  console.log(
-    "Deploying the contracts with the account:",
-    await deployer.getAddress()
-  );
-
-  console.log("Account balance:", (await deployer.getBalance()).toString());
-
+  // console.log("Deploying contracts with the account:", deployer.address);
+  const ICOToken = await ethers.getContractFactory("ICOToken");
+  const token = await ICOToken.deploy();
+  //console.log("Token address:", token.address);
   const Token = await ethers.getContractFactory("Token");
-  const token = await Token.deploy();
-  await token.deployed();
-
-  console.log("Token address:", token.address);
-
-  // We also save the contract's artifacts and address in the frontend directory
-  saveFrontendFiles(token);
+  const tokenContract = await Token.deploy(
+    token.address,
+    100,
+    1000,
+    10,
+    50,
+    Math.floor(new Date('2023-05-09T23:28:00') / 1000),
+    Math.floor(new Date('2023-05-14T09:00:00') / 1000)
+  );
+  await token.mint(tokenContract.address,50000);
+  saveFrontendFiles(tokenContract,token);
 }
-
-function saveFrontendFiles(token) {
+function saveFrontendFiles(token,icoToken) {
   const fs = require("fs");
   const contractsDir = path.join(__dirname, "..", "frontend", "src", "contracts");
 
@@ -51,8 +38,20 @@ function saveFrontendFiles(token) {
     path.join(contractsDir, "Token.json"),
     JSON.stringify(TokenArtifact, null, 2)
   );
-}
 
+  //////////
+  fs.writeFileSync(
+    path.join(contractsDir, "ICOcontract-address.json"),
+    JSON.stringify({ Token: icoToken.address }, undefined, 2)
+  );
+
+  const ICOTokenArtifact = artifacts.readArtifactSync("ICOToken");
+
+  fs.writeFileSync(
+    path.join(contractsDir, "ICOToken.json"),
+    JSON.stringify(ICOTokenArtifact, null, 2)
+  );
+}
 main()
   .then(() => process.exit(0))
   .catch((error) => {

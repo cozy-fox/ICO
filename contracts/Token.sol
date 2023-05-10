@@ -1,78 +1,89 @@
-//SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.0;
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./ICOToken.sol";
 
-// Solidity files have to start with this pragma.
-// It will be used by the Solidity compiler to validate its version.
-pragma solidity ^0.8.9;
-
-// We import this library to be able to use console.log
-import "hardhat/console.sol";
-
-
-// This is the main building block for smart contracts.
 contract Token {
-    // Some string type variables to identify the token.
-    string public name = "My Hardhat Token";
-    string public symbol = "MHT";
-
-    // The fixed amount of tokens stored in an unsigned integer type variable.
-    uint256 public totalSupply = 1000000;
-
-    // An address type variable is used to store ethereum accounts.
+    using SafeERC20 for IERC20;
+    IERC20 public token;
+    mapping(address => uint256) public deposits;
+    uint256 public softCap;
+    uint256 public hardCap;
+    uint256 public minPurchase;
+    uint256 public maxPurchase;
+    uint256 public startTime;
+    uint256 public endTime;
+    uint256 public totallySell=0;
+    bool public closed;
     address public owner;
+    event Deposit(address indexed account, uint256 amount);
+    event Withdrawal(address indexed account, uint256 amount);
+    event Claim(address indexed account, uint256 amount);
 
-    // A mapping is a key/value map. Here we store each account balance.
-    mapping(address => uint256) balances;
-
-    // The Transfer event helps off-chain aplications understand
-    // what happens within your contract.
-    event Transfer(address indexed _from, address indexed _to, uint256 _value);
-
-    /**
-     * Contract initialization.
-     */
-    constructor() {
-        // The totalSupply is assigned to the transaction sender, which is the
-        // account that is deploying the contract.
-        balances[msg.sender] = totalSupply;
+    constructor(
+        address _token,
+        uint256 _softCap,
+        uint256 _hardCap,
+        uint256 _minPurchase,
+        uint256 _maxPurchase,
+        uint256 _startTime,
+        uint256 _endTime
+    ) {
+        require(_startTime >= block.timestamp, "ICO already started");
+        require(_endTime > _startTime, "End time must be after start time");
+        require(
+            _softCap > 0 && _hardCap > 0 && _hardCap >= _softCap,
+            "Invalid soft/hard cap"
+        );
+        require(_minPurchase > 0, "Invalid min purchase");
+        require(_maxPurchase >= _minPurchase, "Invalid max purchase");
+        token = IERC20(_token);
+        softCap = _softCap;
+        hardCap = _hardCap;
+        minPurchase = _minPurchase;
+        maxPurchase = _maxPurchase;
+        startTime = _startTime;
+        endTime = _endTime;
         owner = msg.sender;
     }
 
-    /**
-     * A function to transfer tokens.
-     *
-     * The `external` modifier makes a function *only* callable from outside
-     * the contract.
-     */
-    function transfer(address to, uint256 amount) external {
-        // Check if the transaction sender has enough tokens.
-        // If `require`'s first argument evaluates to `false` then the
-        // transaction will revert.
-        require(balances[msg.sender] >= amount, "Not enough tokens");
-
-        // We can print messages and values using console.log, a feature of
-        // Hardhat Network:
-        console.log(
-            "Transferring from %s to %s %s tokens",
-            msg.sender,
-            to,
-            amount
+    function deposit(uint256 amount) public {
+        require(
+            block.timestamp >= startTime && block.timestamp <= endTime,
+            "ICO is closed"
         );
-
-        // Transfer the amount.
-        balances[msg.sender] -= amount;
-        balances[to] += amount;
-
-        // Notify off-chain applications of the transfer.
-        emit Transfer(msg.sender, to, amount);
+        require(
+            amount >= minPurchase && amount <= maxPurchase,
+            "Invalid deposit amount"
+        );
+        deposits[msg.sender] += amount;
+        totallySell+=amount;
+        emit Deposit(msg.sender, amount);
     }
 
-    /**
-     * Read only function to retrieve the token balance of a given account.
-     *
-     * The `view` modifier indicates that it doesn't modify the contract's
-     * state, which allows us to call it without executing a transaction.
-     */
-    function balanceOf(address account) external view returns (uint256) {
-        return balances[account];
+    function withdraw() public {
+        require(block.timestamp > endTime, "ICO is not closed yet");
+        require(!closed, "ICO is already closed");
+        closed = true;
+        uint256 balance = token.balanceOf(address(this));
+        if (balance < softCap) {
+            uint256 decreassed=deposits[msg.sender];
+            totallySell-=decreassed;
+            deposits[msg.sender] = 0;
+            emit Withdrawal(msg.sender, deposits[msg.sender]);
+        } else {
+            uint256 totalDeposits = deposits[msg.sender];
+            uint256 totalSupply = token.totalSupply();
+            uint256 userTokens = (totalDeposits * totalSupply) / hardCap;
+            token.safeTransfer(msg.sender, userTokens);
+            emit Claim(msg.sender, userTokens);
+        }
+    }
+
+    function balanceOf() external view returns (uint256) {
+        return deposits[msg.sender];
+    }
+
+    function totalbalanceOf() external view returns (uint256) {
+        return token.balanceOf(address(this));
     }
 }
