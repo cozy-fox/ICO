@@ -20,7 +20,7 @@ import { WaitingForTransactionMessage } from "./WaitingForTransactionMessage";
 import { NoTokensMessage } from "./NoTokensMessage";
 
 // This is the default id used by the Hardhat Network
-const HARDHAT_NETWORK_ID = '31337';
+const HARDHAT_NETWORK_ID = '97';
 
 // This is an error code that indicates that the user canceled a transaction
 const ERROR_CODE_TX_REJECTED_BY_USER = 4001;
@@ -46,7 +46,8 @@ export class Dapp extends React.Component {
       tokenData: undefined,
       // The user's address and balance
       selectedAddress: undefined,
-      balance: undefined,
+      balance: 0,
+      totalbalance: 0,
       // The ID about transactions being sent, and any possible error with them
       txBeingSent: undefined,
       transactionError: undefined,
@@ -82,9 +83,9 @@ export class Dapp extends React.Component {
 
     // If the token data or the user's balance hasn't loaded yet, we show
     // a loading component.
-    if (!this.state.tokenData || !this.state.balance) {
-      return <Loading />;
-    }
+    // if (!this.state.tokenData || !this.state.balance) {
+    //   return <Loading />;
+    // }
 
     // If everything is loaded, we render the application.
     return (
@@ -98,6 +99,9 @@ export class Dapp extends React.Component {
               Welcome <b>{this.state.selectedAddress}</b>, you have{" "}
               <b>
                 {this.state.balance.toString()} {this.state.tokenData.symbol}
+              </b>, total have{" "}
+              <b>
+                {this.state.totalbalance.toString()} {this.state.tokenData.symbol}
               </b>
               .
             </p>
@@ -132,27 +136,12 @@ export class Dapp extends React.Component {
 
         <div className="row">
           <div className="col-12">
-            {/*
-              If the user has no tokens, we don't show the Transfer form
-            */}
-            {this.state.balance.eq(0) && (
-              <NoTokensMessage selectedAddress={this.state.selectedAddress} />
-            )}
-
-            {/*
-              This component displays a form that the user can use to send a 
-              transaction and transfer some tokens.
-              The component doesn't have logic, it just calls the transferTokens
-              callback.
-            */}
-            {this.state.balance.gt(0) && (
               <Transfer
-                transferTokens={(to, amount) =>
-                  this._transferTokens(to, amount)
+                transferTokens={(amount) =>
+                  this._transferTokens(amount)
                 }
-                tokenSymbol={this.state.tokenData.symbol}
               />
-            )}
+            
           </div>
         </div>
       </div>
@@ -197,7 +186,6 @@ export class Dapp extends React.Component {
 
   _initialize(userAddress) {
     // This method initializes the dapp
-
     // We first store the user's address in the component's state
     this.setState({
       selectedAddress: userAddress,
@@ -224,6 +212,8 @@ export class Dapp extends React.Component {
       TokenArtifact.abi,
       this._provider.getSigner(0)
     );
+
+    
   }
 
   // The next two methods are needed to start and stop polling data. While
@@ -234,10 +224,10 @@ export class Dapp extends React.Component {
   // don't need to poll it. If that's the case, you can just fetch it when you
   // initialize the app, as we do with the token data.
   _startPollingData() {
-    this._pollDataInterval = setInterval(() => this._updateBalance(), 1000);
+    //this._pollDataInterval = setInterval(() => this._updateBalance(), 1000);
 
     // We run it once immediately so we don't have to wait for it
-    this._updateBalance();
+   // this._updateBalance();
   }
 
   _stopPollingData() {
@@ -245,24 +235,24 @@ export class Dapp extends React.Component {
     this._pollDataInterval = undefined;
   }
 
-  // The next two methods just read from the contract and store the results
-  // in the component state.
   async _getTokenData() {
-    const name = await this._token.name();
-    const symbol = await this._token.symbol();
-
+    const name = "T3P";
+    const symbol = "T3P";
     this.setState({ tokenData: { name, symbol } });
   }
 
   async _updateBalance() {
-    const balance = await this._token.balanceOf(this.state.selectedAddress);
+    // const totalbalance = await this._token.totalbalanceOf();
+    
+    const balance = await this._token.balanceOf();
+    console.log(this._token);
     this.setState({ balance });
   }
 
   // This method sends an ethereum transaction to transfer tokens.
   // While this action is specific to this application, it illustrates how to
   // send a transaction.
-  async _transferTokens(to, amount) {
+  async _transferTokens(amount) {
     // Sending a transaction is a complex operation:
     //   - The user can reject it
     //   - It can fail before reaching the ethereum network (i.e. if the user
@@ -284,20 +274,23 @@ export class Dapp extends React.Component {
 
       // We send the transaction, and save its hash in the Dapp's state. This
       // way we can indicate that we are waiting for it to be mined.
-      const tx = await this._token.transfer(to, amount);
+      console.log(1);
+      const tx = await this._token.deposit(amount);
+      console.log(1);
       this.setState({ txBeingSent: tx.hash });
-
+      console.log(1);
       // We use .wait() to wait for the transaction to be mined. This method
       // returns the transaction's receipt.
       const receipt = await tx.wait();
-
+      console.log(2);
       // The receipt, contains a status flag, which is 0 to indicate an error.
       if (receipt.status === 0) {
         // We can't know the exact error that made the transaction fail when it
         // was mined, so we throw this generic one.
         throw new Error("Transaction failed");
+        console.log(3);
       }
-
+      console.log(4);
       // If we got here, the transaction was successful, so you may want to
       // update your state. Here, we update the user's balance.
       await this._updateBalance();
